@@ -89,52 +89,29 @@ export default function App() {
 
       const setField = (name: string, value: string) => {
         try {
-          // 1. Tenta nome exato
           const field = form.getTextField(name);
           field.setText(value || "");
+          console.log(`Campo preenchido: ${name}`);
         } catch (e) {
-          // 2. Busca insensível a maiúsculas/minúsculas no nome real do campo
-          const fieldNameUpper = name.toUpperCase();
+          // Busca insensível e por variações se o nome exato falhar
+          const search = name.toUpperCase().replace(/[\/_-\s]/g, '');
           const target = allFields.find(f => {
-            const fName = f.getName().toUpperCase();
-            return fName === fieldNameUpper || 
-                   fName === fieldNameUpper.replace(/_/g, '/') || 
-                   fName === fieldNameUpper.replace(/_/g, '-');
+            const fName = f.getName().toUpperCase().replace(/[\/_-\s]/g, '');
+            // Verifica se é um campo de texto e se o nome bate
+            return (f.constructor.name === 'PDFTextField' || (f as any).setText) && 
+                   (fName === search || fName.includes(search));
           });
 
-          if (target && target.constructor.name === 'PDFTextField') {
+          if (target) {
             try {
               (target as any).setText(value || "");
+              console.log(`Campo preenchido (busca): ${target.getName()} para ${name}`);
               return;
-            } catch (err) {}
-          }
-
-          // 3. Tenta variações conhecidas
-          const variations: Record<string, string[]> = {
-            "REG_FL": ["REG FL", "FILIAL", "NOME_FILIAL", "LOJA"],
-            "SEG_SEX": ["SEG/SEX", "SEG-SEX", "seg_sex", "horario1", "Seg/Sex", "HORARIO_FILIAL_1"],
-            "SAB": ["SÁBADO", "SABADO", "sab", "horario2", "Sab", "HORARIO_FILIAL_2"],
-            "DOM_FER": ["DOMINGO", "DOM/FER", "DOM-FER", "FERIADO", "horario3", "Dom/Fer", "HORARIO_FILIAL_3"]
-          };
-
-          if (variations[name]) {
-            for (const v of variations[name]) {
-              try {
-                const f = form.getTextField(v);
-                f.setText(value || "");
-                return;
-              } catch (err) {
-                // Tenta busca insensível para a variação também
-                const vUpper = v.toUpperCase();
-                const vTarget = allFields.find(f => f.getName().toUpperCase() === vUpper);
-                if (vTarget && (vTarget as any).setText) {
-                  (vTarget as any).setText(value || "");
-                  return;
-                }
-              }
+            } catch (err) {
+              console.error(`Erro ao definir texto no campo ${target.getName()}:`, err);
             }
           }
-          console.warn(`Campo ${name} não preenchido com sucesso.`);
+          console.warn(`Campo ${name} (ou similar) não encontrado no PDF.`);
         }
       };
 
@@ -145,17 +122,20 @@ export default function App() {
       const ano = String(hoje.getFullYear());
       
       try {
+        // Tentativa de desenhar a data por cima (ajustado para o padrão CRF-SC)
         firstPage.drawText(dia, { x: 432, y: 195, size: 10 });
         firstPage.drawText(mes, { x: 450, y: 195, size: 10 });
         firstPage.drawText(ano, { x: 469, y: 195, size: 10 });
       } catch (e) {
-        console.warn("Could not draw date on first page", e);
+        console.warn("Não foi possível desenhar a data na página.", e);
       }
 
-      setField("REG_FL", storeInfo.filial);
-      setField("RL", storeInfo.rl);
-      setField("CPF_RL", storeInfo.cpf);
+      // Preenchimento de informações da Empresa
+      setField("Empresa", storeInfo.nome);
       setField("CNPJ", storeInfo.cnpj);
+      setField("Registro no CRF-SC", storeInfo.filial); // O campo pode se chamar assim
+      setField("representada por", storeInfo.rl);
+      setField("CPF", storeInfo.cpf);
 
       // Formatação e preenchimento dos horários da filial no PDF
       const formatStoreRow = (day: DayKey) => {
@@ -167,6 +147,7 @@ export default function App() {
         return (i && r) ? `${a}-${i} / ${r}-${f}` : `${a}-${f}`;
       };
 
+      // Horários da Filial - Nomes exatos comuns no Modelo 27 CRF-SC
       setField("SEG_SEX", formatStoreRow('seg'));
       setField("SAB", formatStoreRow('sab'));
       setField("DOM_FER", formatStoreRow('dom'));
