@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-light tracking-tight text-white/90">
-          Glass <span className="font-semibold text-blue-400 text-glow">Escala</span> Pro
+          Validador <span className="font-semibold text-blue-400 text-glow">CRF-SC</span> 
         </h1>
         <div className="flex items-center gap-3">
           <button 
