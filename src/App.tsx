@@ -66,18 +66,29 @@ export default function App() {
     if (!result || !result.isValid) return;
     setLoading(true);
     try {
-      // Decode Base64 safely by stripping any whitespace and ensuring correct padding
-      let cleanBase64 = PDF_MODEL_BASE64.trim().replace(/\s/g, '');
-      while (cleanBase64.length % 4 !== 0) {
-        cleanBase64 += '=';
-      }
-      const binaryString = atob(cleanBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      let pdfBytes: Uint8Array;
+      
+      try {
+        // Tenta carregar do arquivo público primeiro
+        const response = await fetch('/modelo.pdf');
+        if (!response.ok) throw new Error("Arquivo modelo.pdf não encontrado na pasta public");
+        const arrayBuffer = await response.arrayBuffer();
+        pdfBytes = new Uint8Array(arrayBuffer);
+      } catch (fetchError) {
+        console.warn("Falha ao carregar modelo.pdf da pasta public, tentando Base64...", fetchError);
+        // Fallback para Base64 se o arquivo não existir
+        let cleanBase64 = PDF_MODEL_BASE64.trim().replace(/\s/g, '');
+        while (cleanBase64.length % 4 !== 0) {
+          cleanBase64 += '=';
+        }
+        const binaryString = atob(cleanBase64);
+        pdfBytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          pdfBytes[i] = binaryString.charCodeAt(i);
+        }
       }
       
-      const pdfDoc = await PDFDocument.load(bytes);
+      const pdfDoc = await PDFDocument.load(pdfBytes);
       const form = pdfDoc.getForm();
       const pages = pdfDoc.getPages();
       const firstPage = pages[0];
@@ -152,8 +163,8 @@ export default function App() {
         }
       }
 
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const finalPdfBytes = await pdfDoc.save();
+      const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = "Escala_Preenchida.pdf";
@@ -163,8 +174,10 @@ export default function App() {
         window.open("https://www.gov.br/pt-br/servicos/assinatura-eletronica?origem=maisacessado_home", "_blank");
       }
     } catch (e) {
-      console.error(e);
-      alert("Erro ao processar o PDF. Verifique se o modelo Base64 é válido.");
+      console.error("Erro detalhado do PDF:", e);
+      let msg = "Erro desconhecido ao processar o PDF.";
+      if (e instanceof Error) msg = e.message;
+      alert(`Falha na geração do PDF: ${msg}\n\nDica: Verifique se o arquivo 'public/modelo.pdf' existe ou se o Base64 em constants.ts está correto.`);
     } finally {
       setLoading(false);
     }
