@@ -5,7 +5,6 @@ import { FarmaCard } from './components/FarmaCard';
 import { ValidationSummary } from './components/ValidationSummary';
 import { FarmaData, StoreHours, ValidationResult, DAYS, DayKey } from './types';
 import { validateSchedule } from './utils';
-import { PDF_MODEL_BASE64 } from './constants';
 import { PDFDocument } from 'pdf-lib';
 
 const INITIAL_SHIFT = { e: '', i: '', r: '', s: '' };
@@ -68,43 +67,14 @@ export default function App() {
     try {
       let pdfBytes: Uint8Array | null = null;
       
-      // Lista de possíveis locais para o arquivo PDF
-      const possiblePaths = ['/modelo.pdf', '/modelo.pdf.pdf', 'modelo.pdf'];
-      
-      for (const path of possiblePaths) {
-        try {
-          const response = await fetch(path);
-          if (response.ok) {
-            const arrayBuffer = await response.arrayBuffer();
-            pdfBytes = new Uint8Array(arrayBuffer);
-            console.log(`Sucesso ao carregar PDF de: ${path}`);
-            break;
-          }
-        } catch (e) {
-          console.warn(`Tentativa falhou para ${path}:`, e);
-        }
-      }
-
-      if (!pdfBytes) {
-        console.warn("Nenhum arquivo PDF encontrado na pasta public, tentando Base64...");
-        // Fallback para Base64 se o arquivo não existir
-        if (!PDF_MODEL_BASE64 || PDF_MODEL_BASE64.length < 100) {
-          throw new Error("O modelo Base64 em 'constants.ts' está vazio ou é muito curto. Carregue o arquivo 'modelo.pdf' na pasta 'public'.");
-        }
-        
-        try {
-          let cleanBase64 = PDF_MODEL_BASE64.trim().replace(/\s/g, '');
-          while (cleanBase64.length % 4 !== 0) {
-            cleanBase64 += '=';
-          }
-          const binaryString = atob(cleanBase64);
-          pdfBytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            pdfBytes[i] = binaryString.charCodeAt(i);
-          }
-        } catch (atobError) {
-          throw new Error("O código Base64 em 'constants.ts' é inválido. Certifique-se de que o arquivo 'public/modelo.pdf' existe e está com o nome correto.");
-        }
+      try {
+        const response = await fetch('/modelo.pdf');
+        if (!response.ok) throw new Error("Arquivo 'modelo.pdf' não encontrado na pasta 'public'.");
+        const arrayBuffer = await response.arrayBuffer();
+        pdfBytes = new Uint8Array(arrayBuffer);
+        console.log("Sucesso ao carregar PDF de: /modelo.pdf");
+      } catch (e) {
+        throw new Error("Certifique-se de que o arquivo 'public/modelo.pdf' existe.");
       }
       
       const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -119,14 +89,32 @@ export default function App() {
 
       const setField = (name: string, value: string) => {
         try {
+          // 1. Tenta nome exato
           const field = form.getTextField(name);
           field.setText(value || "");
         } catch (e) {
-          // Se falhou, tentamos variações comuns de nomes (CRF-SC costuma usar barras ou nomes completos)
+          // 2. Busca insensível a maiúsculas/minúsculas no nome real do campo
+          const fieldNameUpper = name.toUpperCase();
+          const target = allFields.find(f => {
+            const fName = f.getName().toUpperCase();
+            return fName === fieldNameUpper || 
+                   fName === fieldNameUpper.replace(/_/g, '/') || 
+                   fName === fieldNameUpper.replace(/_/g, '-');
+          });
+
+          if (target && target.constructor.name === 'PDFTextField') {
+            try {
+              (target as any).setText(value || "");
+              return;
+            } catch (err) {}
+          }
+
+          // 3. Tenta variações conhecidas
           const variations: Record<string, string[]> = {
-            "SEG_SEX": ["SEG/SEX", "SEG-SEX", "seg_sex", "horario1", "Seg/Sex"],
-            "SAB": ["SABADO", "SÁBADO", "sab", "horario2", "Sab"],
-            "DOM_FER": ["DOMINGO", "DOM/FER", "DOM-FER", "FERIADO", "horario3", "Dom/Fer"]
+            "REG_FL": ["REG FL", "FILIAL", "NOME_FILIAL", "LOJA"],
+            "SEG_SEX": ["SEG/SEX", "SEG-SEX", "seg_sex", "horario1", "Seg/Sex", "HORARIO_FILIAL_1"],
+            "SAB": ["SÁBADO", "SABADO", "sab", "horario2", "Sab", "HORARIO_FILIAL_2"],
+            "DOM_FER": ["DOMINGO", "DOM/FER", "DOM-FER", "FERIADO", "horario3", "Dom/Fer", "HORARIO_FILIAL_3"]
           };
 
           if (variations[name]) {
@@ -135,10 +123,18 @@ export default function App() {
                 const f = form.getTextField(v);
                 f.setText(value || "");
                 return;
-              } catch (err) {}
+              } catch (err) {
+                // Tenta busca insensível para a variação também
+                const vUpper = v.toUpperCase();
+                const vTarget = allFields.find(f => f.getName().toUpperCase() === vUpper);
+                if (vTarget && (vTarget as any).setText) {
+                  (vTarget as any).setText(value || "");
+                  return;
+                }
+              }
             }
           }
-          console.warn(`Campo ${name} não encontrado no PDF.`);
+          console.warn(`Campo ${name} não preenchido com sucesso.`);
         }
       };
 
@@ -216,7 +212,7 @@ export default function App() {
       console.error("Erro detalhado do PDF:", e);
       let msg = "Erro desconhecido ao processar o PDF.";
       if (e instanceof Error) msg = e.message;
-      alert(`Falha na geração do PDF: ${msg}\n\nDica: Verifique se o arquivo 'public/modelo.pdf' existe ou se o Base64 em constants.ts está correto.`);
+      alert(`Falha na geração do PDF: ${msg}\n\nDica: Verifique se o arquivo 'public/modelo.pdf' existe e está com o nome correto.`);
     } finally {
       setLoading(false);
     }
