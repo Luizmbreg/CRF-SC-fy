@@ -131,11 +131,11 @@ export default function App() {
       }
 
       // Preenchimento de informações da Empresa
-      setField("Empresa", storeInfo.nome);
+      setField("DIMED", storeInfo.nome);
       setField("CNPJ", storeInfo.cnpj);
-      setField("Registro no CRF-SC", storeInfo.filial); // O campo pode se chamar assim
-      setField("representada por", storeInfo.rl);
-      setField("CPF", storeInfo.cpf);
+      setField("REG_FL", storeInfo.filial); // Registro da Filial no CRF-SC
+      setField("RL", storeInfo.rl);
+      setField("CPF_RL", storeInfo.cpf);
 
       // Formatação e preenchimento dos horários da filial no PDF
       const formatStoreRow = (day: DayKey) => {
@@ -147,10 +147,10 @@ export default function App() {
         return (i && r) ? `${a}-${i} / ${r}-${f}` : `${a}-${f}`;
       };
 
-      // Horários da Filial - Nomes exatos comuns no Modelo 27 CRF-SC
-      setField("SEG_SEX", formatStoreRow('seg'));
-      setField("SAB", formatStoreRow('sab'));
-      setField("DOM_FER", formatStoreRow('dom'));
+      // Horários da Filial - Nomes exatos do PDF
+      setField("seg_FL", formatStoreRow('seg'));
+      setField("sab_FL", formatStoreRow('sab'));
+      setField("dom_FL", formatStoreRow('dom'));
 
       for (let i = 1; i <= 6; i++) {
         const farma = farmas[i - 1];
