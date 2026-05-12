@@ -109,6 +109,11 @@ export default function App() {
       
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const form = pdfDoc.getForm();
+      const allFields = form.getFields();
+      
+      // LOG DE DEPURAÇÃO: Mostra todos os campos do PDF no console do navegador (F12)
+      console.log("Campos disponíveis no PDF:", allFields.map(f => f.getName()));
+
       const pages = pdfDoc.getPages();
       const firstPage = pages[0];
 
@@ -117,7 +122,23 @@ export default function App() {
           const field = form.getTextField(name);
           field.setText(value || "");
         } catch (e) {
-          console.warn(`Field ${name} not found in PDF`);
+          // Se falhou, tentamos variações comuns de nomes (CRF-SC costuma usar barras ou nomes completos)
+          const variations: Record<string, string[]> = {
+            "SEG_SEX": ["SEG/SEX", "SEG-SEX", "seg_sex", "horario1", "Seg/Sex"],
+            "SAB": ["SABADO", "SÁBADO", "sab", "horario2", "Sab"],
+            "DOM_FER": ["DOMINGO", "DOM/FER", "DOM-FER", "FERIADO", "horario3", "Dom/Fer"]
+          };
+
+          if (variations[name]) {
+            for (const v of variations[name]) {
+              try {
+                const f = form.getTextField(v);
+                f.setText(value || "");
+                return;
+              } catch (err) {}
+            }
+          }
+          console.warn(`Campo ${name} não encontrado no PDF.`);
         }
       };
 
@@ -150,23 +171,9 @@ export default function App() {
         return (i && r) ? `${a}-${i} / ${r}-${f}` : `${a}-${f}`;
       };
 
-      // Tenta nomes com barra primeiro (comum no CRF-SC), depois sem
-      const setMultiField = (names: string[], value: string) => {
-        for (const name of names) {
-          try {
-            const field = form.getTextField(name);
-            field.setText(value || "");
-            return;
-          } catch (e) {
-            // tenta o próximo nome
-          }
-        }
-        console.warn(`Campo ${names[0]} não encontrado.`);
-      };
-
-      setMultiField(["SEG/SEX", "SEG_SEX", "Seg/Sex", "seg/sex"], formatStoreRow('seg'));
-      setMultiField(["SAB", "sab", "Sab"], formatStoreRow('sab'));
-      setMultiField(["DOM/FER", "DOM_FER", "Dom/Fer", "dom/fer"], formatStoreRow('dom'));
+      setField("SEG_SEX", formatStoreRow('seg'));
+      setField("SAB", formatStoreRow('sab'));
+      setField("DOM_FER", formatStoreRow('dom'));
 
       for (let i = 1; i <= 6; i++) {
         const farma = farmas[i - 1];
