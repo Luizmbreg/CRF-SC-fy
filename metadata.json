@@ -1,0 +1,6 @@
+{
+  "name": "Glass Escala Pro",
+  "description": "Validador de escalas semanais com interface glassmorphism estilo iOS, suporte a cálculo de horas CLT e geração de PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
