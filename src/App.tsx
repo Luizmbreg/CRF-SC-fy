@@ -141,19 +141,32 @@ export default function App() {
       setField("CNPJ", storeInfo.cnpj);
 
       // Formatação e preenchimento dos horários da filial no PDF
-      const formatStoreRow = (days: DayKey[]) => {
-        const d = days[0];
-        const a = storeHours.abertura[d];
-        const i = storeHours.intervalo[d];
-        const r = storeHours.retorno[d];
-        const f = storeHours.fechamento[d];
+      const formatStoreRow = (day: DayKey) => {
+        const a = storeHours.abertura[day];
+        const i = storeHours.intervalo[day];
+        const r = storeHours.retorno[day];
+        const f = storeHours.fechamento[day];
         if (!a || !f) return "";
         return (i && r) ? `${a}-${i} / ${r}-${f}` : `${a}-${f}`;
       };
 
-      setField("SEG_SEX", formatStoreRow(['seg']));
-      setField("SAB", formatStoreRow(['sab']));
-      setField("DOM_FER", formatStoreRow(['dom']));
+      // Tenta nomes com barra primeiro (comum no CRF-SC), depois sem
+      const setMultiField = (names: string[], value: string) => {
+        for (const name of names) {
+          try {
+            const field = form.getTextField(name);
+            field.setText(value || "");
+            return;
+          } catch (e) {
+            // tenta o próximo nome
+          }
+        }
+        console.warn(`Campo ${names[0]} não encontrado.`);
+      };
+
+      setMultiField(["SEG/SEX", "SEG_SEX", "Seg/Sex", "seg/sex"], formatStoreRow('seg'));
+      setMultiField(["SAB", "sab", "Sab"], formatStoreRow('sab'));
+      setMultiField(["DOM/FER", "DOM_FER", "Dom/Fer", "dom/fer"], formatStoreRow('dom'));
 
       for (let i = 1; i <= 6; i++) {
         const farma = farmas[i - 1];
