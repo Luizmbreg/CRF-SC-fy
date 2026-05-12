@@ -66,25 +66,44 @@ export default function App() {
     if (!result || !result.isValid) return;
     setLoading(true);
     try {
-      let pdfBytes: Uint8Array;
+      let pdfBytes: Uint8Array | null = null;
       
-      try {
-        // Tenta carregar do arquivo público primeiro
-        const response = await fetch('/modelo.pdf');
-        if (!response.ok) throw new Error("Arquivo modelo.pdf não encontrado na pasta public");
-        const arrayBuffer = await response.arrayBuffer();
-        pdfBytes = new Uint8Array(arrayBuffer);
-      } catch (fetchError) {
-        console.warn("Falha ao carregar modelo.pdf da pasta public, tentando Base64...", fetchError);
-        // Fallback para Base64 se o arquivo não existir
-        let cleanBase64 = PDF_MODEL_BASE64.trim().replace(/\s/g, '');
-        while (cleanBase64.length % 4 !== 0) {
-          cleanBase64 += '=';
+      // Lista de possíveis locais para o arquivo PDF
+      const possiblePaths = ['/modelo.pdf', '/modelo.pdf.pdf', 'modelo.pdf'];
+      
+      for (const path of possiblePaths) {
+        try {
+          const response = await fetch(path);
+          if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            pdfBytes = new Uint8Array(arrayBuffer);
+            console.log(`Sucesso ao carregar PDF de: ${path}`);
+            break;
+          }
+        } catch (e) {
+          console.warn(`Tentativa falhou para ${path}:`, e);
         }
-        const binaryString = atob(cleanBase64);
-        pdfBytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          pdfBytes[i] = binaryString.charCodeAt(i);
+      }
+
+      if (!pdfBytes) {
+        console.warn("Nenhum arquivo PDF encontrado na pasta public, tentando Base64...");
+        // Fallback para Base64 se o arquivo não existir
+        if (!PDF_MODEL_BASE64 || PDF_MODEL_BASE64.length < 100) {
+          throw new Error("O modelo Base64 em 'constants.ts' está vazio ou é muito curto. Carregue o arquivo 'modelo.pdf' na pasta 'public'.");
+        }
+        
+        try {
+          let cleanBase64 = PDF_MODEL_BASE64.trim().replace(/\s/g, '');
+          while (cleanBase64.length % 4 !== 0) {
+            cleanBase64 += '=';
+          }
+          const binaryString = atob(cleanBase64);
+          pdfBytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            pdfBytes[i] = binaryString.charCodeAt(i);
+          }
+        } catch (atobError) {
+          throw new Error("O código Base64 em 'constants.ts' é inválido. Certifique-se de que o arquivo 'public/modelo.pdf' existe e está com o nome correto.");
         }
       }
       
