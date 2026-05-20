@@ -131,7 +131,6 @@ export default function App() {
       }
 
       // Preenchimento de informações da Empresa
-      setField("DIMED", storeInfo.nome);
       setField("CNPJ", storeInfo.cnpj);
       setField("REG_FL", storeInfo.filial); // Registro da Filial no CRF-SC
       setField("RL", storeInfo.rl);
